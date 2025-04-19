@@ -5,14 +5,35 @@ from typing import List
 def get_article(db: Session, article_id: str):
     article = db.query(models.Article).filter(models.Article.id == article_id).first()
     if article:
-        article.tags = [tag.name for tag in article.tags]  # タグを文字列のリストに変換
-    return article
+        # レスポンス用の辞書を作成
+        response_dict = {
+            "id": article.id,
+            "title": article.title,
+            "content": article.content,
+            "user_id": article.user_id,
+            "created_at": article.created_at,
+            "updated_at": article.updated_at,
+            "tags": [tag.name for tag in article.tags]  # タグ名のリストを作成
+        }
+        return schemas.Article(**response_dict)
+    return None
 
 def get_articles(db: Session, skip: int = 0, limit: int = 100):
     articles = db.query(models.Article).offset(skip).limit(limit).all()
+    # レスポンス用のリストを作成
+    response_list = []
     for article in articles:
-        article.tags = [tag.name for tag in article.tags]  # タグを文字列のリストに変換
-    return articles
+        response_dict = {
+            "id": article.id,
+            "title": article.title,
+            "content": article.content,
+            "user_id": article.user_id,
+            "created_at": article.created_at,
+            "updated_at": article.updated_at,
+            "tags": [tag.name for tag in article.tags]  # タグ名のリストを作成
+        }
+        response_list.append(schemas.Article(**response_dict))
+    return response_list
 
 def create_article(db: Session, article: schemas.ArticleCreate, user_id: str):
     # タグの取得または作成
@@ -49,7 +70,7 @@ def create_article(db: Session, article: schemas.ArticleCreate, user_id: str):
     return schemas.Article(**response_dict)
 
 def update_article(db: Session, article_id: str, article: schemas.ArticleCreate):
-    db_article = get_article(db, article_id)
+    db_article = db.query(models.Article).filter(models.Article.id == article_id).first()
     if not db_article:
         return None
 
@@ -64,7 +85,7 @@ def update_article(db: Session, article_id: str, article: schemas.ArticleCreate)
             db.refresh(tag)
         tags.append(tag)
 
-    # 元のタグオブジェクトを保存
+    # 記事の更新
     db_article.tags = tags
     db_article.title = article.title
     db_article.content = article.content
@@ -72,12 +93,20 @@ def update_article(db: Session, article_id: str, article: schemas.ArticleCreate)
     db.commit()
     db.refresh(db_article)
     
-    # レスポンス用にタグを文字列のリストに変換
-    db_article.tags = [tag.name for tag in tags]
-    return db_article
+    # レスポンス用のデータを作成
+    response_dict = {
+        "id": db_article.id,
+        "title": db_article.title,
+        "content": db_article.content,
+        "user_id": db_article.user_id,
+        "created_at": db_article.created_at,
+        "updated_at": db_article.updated_at,
+        "tags": [tag.name for tag in db_article.tags]
+    }
+    return schemas.Article(**response_dict)
 
 def delete_article(db: Session, article_id: str):
-    db_article = get_article(db, article_id)
+    db_article = db.query(models.Article).filter(models.Article.id == article_id).first()
     if db_article:
         db.delete(db_article)
         db.commit()
