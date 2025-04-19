@@ -4,7 +4,8 @@ from ..db.database import get_db
 from ..crud import crud_article
 from ..schemas import schemas
 from typing import List
-from ..core.security import oauth2_scheme
+from ..core.security import get_current_user
+from ..models.models import User
 
 router = APIRouter()
 
@@ -21,36 +22,37 @@ def get_article(article_id: str, db: Session = Depends(get_db)):
     return db_article
 
 @router.post("", response_model=schemas.Article)
-def create_article(
+async def create_article(
     article: schemas.ArticleCreate,
     db: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
+    current_user: User = Depends(get_current_user)
 ):
-    return crud_article.create_article(db=db, article=article, user_id=token)
+    return crud_article.create_article(db=db, article=article, user_id=str(current_user.id))
 
 @router.put("/{article_id}", response_model=schemas.Article)
-def update_article(
+async def update_article(
     article_id: str,
     article: schemas.ArticleCreate,
     db: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
-):
-    db_article = crud_article.update_article(db, article_id=article_id, article=article)
-    if db_article is None:
-        raise HTTPException(status_code=404, detail="記事が見つかりません")
-    if db_article.user_id != token:
-        raise HTTPException(status_code=403, detail="この操作は許可されていません")
-    return db_article
-
-@router.delete("/{article_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_article(
-    article_id: str,
-    db: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
+    current_user: User = Depends(get_current_user)
 ):
     db_article = crud_article.get_article(db, article_id=article_id)
     if db_article is None:
         raise HTTPException(status_code=404, detail="記事が見つかりません")
-    if db_article.user_id != token:
+    if db_article.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="この操作は許可されていません")
+    
+    return crud_article.update_article(db, article_id=article_id, article=article)
+
+@router.delete("/{article_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_article(
+    article_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    db_article = crud_article.get_article(db, article_id=article_id)
+    if db_article is None:
+        raise HTTPException(status_code=404, detail="記事が見つかりません")
+    if db_article.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="この操作は許可されていません")
     crud_article.delete_article(db, article_id=article_id)
