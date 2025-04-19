@@ -19,7 +19,15 @@ const initialState: AuthState = {
 export const login = createAsyncThunk(
   'auth/login',
   async (credentials: LoginCredentials) => {
-    const response = await client.post('/api/auth/login', credentials)
+    const formData = new URLSearchParams()
+    formData.append('username', credentials.email)
+    formData.append('password', credentials.password)
+    
+    const response = await client.post('/api/auth/login', formData.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    })
     const { access_token } = response.data
     localStorage.setItem('token', access_token)
     return access_token
